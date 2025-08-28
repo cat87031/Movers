@@ -1,0 +1,355 @@
+
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>A1 Movers 單字發音＋拼讀小遊戲（HTML 版，可下載）</title>
+<style>
+  :root{--bg:#f7fbff;--card:#ffffff;--muted:#6b7280;--accent:#0b74ff;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:linear-gradient(180deg,var(--bg),#fff);color:#0f172a}
+  .wrap{max-width:1000px;margin:28px auto;padding:20px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  h1{font-size:20px;margin:0}
+  p.lead{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .controls{display:grid;grid-template-columns:1fr 220px 160px;gap:10px;margin-top:18px}
+  .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06);border:1px solid #e6eefc}
+  input[type=text], select {width:100%;padding:8px 10px;border-radius:8px;border:1px solid #e6eefc;background:#f8fbff}
+  .btn{display:inline-block;padding:8px 12px;border-radius:10px;border:none;background:var(--accent);color:white;cursor:pointer}
+  .btn.ghost{background:white;color:var(--accent);border:1px solid #dbeefe}
+  .grid{display:grid;grid-template-columns:1fr 320px;gap:12px;margin-top:14px}
+  .word-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+  .word-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:#fbfeff;border:1px solid #eef7ff}
+  .word-item .meta{font-size:12px;color:var(--muted)}
+  .game-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .hint-box{background:#fcfdff;padding:10px;border-radius:8px;border:1px dashed #e3f2ff;color:var(--muted);font-size:13px}
+  footer{margin-top:18px;font-size:12px;color:var(--muted)}
+  .stats{display:flex;gap:8px;align-items:center;font-size:13px}
+  .mask{font-family:monospace;background:#fff;padding:6px;border-radius:6px;border:1px solid #eef7ff;display:inline-block}
+  @media (max-width:880px){.controls{grid-template-columns:1fr} .grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>A1 Movers 單字發音＋拼讀小遊戲（HTML 版）</h1>
+      <p class="lead">使用瀏覽器語音 API（建議 Chrome）。點單字右方按鈕播放發音。可隨機出題、拼寫得分與提示功能。</p>
+    </div>
+    <div class="stats">
+      <div id="best">Best: 0</div>
+      <div id="score">Score: 0</div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="card">
+      <label>搜尋單字</label>
+      <input id="search" type="text" placeholder="輸入英文或關鍵字..." />
+      <div style="height:8px"></div>
+      <label>主題</label>
+      <select id="group">
+        <option value="All">All</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <label>最長字母數（過濾）: <span id="lenVal">12</span></label>
+      <input id="lenRange" type="range" min="3" max="14" value="12" />
+      <div style="height:8px"></div>
+      <button id="randBtn" class="btn">隨機出題</button>
+      <button id="speakTest" class="btn ghost" style="margin-left:6px">測試發音</button>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+      <div>
+        <label>匯出 / 下載</label>
+        <div style="margin-top:8px">
+          <button id="downloadBtn" class="btn" title="下載此 HTML 檔">下載 HTML 檔</button>
+          <button id="exportWords" class="btn ghost" style="margin-left:8px">匯出單字 JSON</button>
+        </div>
+      </div>
+      <div style="margin-top:12px;color:var(--muted);font-size:13px">
+        建議：在桌面 Chrome 上使用，以得到最穩定的語音表現。
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">拼讀遊戲</h3>
+        <div id="gameArea">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="mask" id="maskText">_ _ _ _</div>
+              <div style="color:var(--muted);font-size:13px;margin-top:6px">字母數: <span id="lenInfo">0</span></div>
+            </div>
+            <div>
+              <button id="playWord" class="btn">播放單字</button>
+              <button id="playLetters" class="btn ghost" style="margin-left:6px">逐字母念</button>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <input id="spellingInput" type="text" placeholder="輸入拼字並按 Enter" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc" />
+            <div class="game-controls">
+              <button id="checkBtn" class="btn">確認</button>
+              <button id="hintFirst" class="btn ghost">提示：第一個字母</button>
+              <button id="hintLast" class="btn ghost">提示：最後一個字母</button>
+              <button id="hintChunks" class="btn ghost">提示：分段念</button>
+              <button id="revealBtn" class="btn ghost">看答案並播放</button>
+            </div>
+            <div style="margin-top:10px" class="hint-box" id="hintBox">提示會顯示在這裡</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3 style="margin:0 0 8px 0">單字清單（點 Play 發音）</h3>
+        <div id="words" class="word-list"></div>
+      </div>
+    </div>
+
+    <aside>
+      <div class="card">
+        <h4 style="margin-top:0">遊戲紀錄</h4>
+        <div>回合: <span id="round">0</span></div>
+        <div>分數: <span id="score2">0</span></div>
+        <div style="height:10px"></div>
+        <div>遮罩: <span class="mask" id="maskShort">_ _ _</span></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h4 style="margin-top:0">分組快速篩選</h4>
+        <div id="groupList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    本頁面為單檔 HTML 範例。資料來源：Cambridge A1 Movers 圖解單字（示範用部分詞彙）。可離線下載並在內部主機使用。
+  </footer>
+</div>
+
+<script>
+// --- Word bank (subset / curated) ---
+const WORD_GROUPS = {
+  "Our town": ["bank","bridge","bus","bus stop","cafe","car","car park","city","city centre","cinema","farm","garden","hospital","hotel","house","library","market","museum","park","playground","police station","post office","restaurant","school","shop","station","street","supermarket","swimming pool","town"],
+  "People & family": ["adult","aunt","baby","boy","brother","child","cousin","dad","doctor","family","friend","girl","grandfather","grandmother","man","mom","mother","nurse","people","sister","teacher","uncle","woman"],
+  "Home & daily life": ["address","bathroom","bedroom","blanket","bottle","bowl","chair","clock","clothes","cup","cupboard","curtain","desk","dining room","door","fridge","kitchen","lamp","pillow","plate","sofa","table","television","toilet","towel","window"],
+  "Food & drink": ["apple","banana","bread","breakfast","burger","cake","carrot","cheese","chicken","chips","chocolate","dinner","egg","fish","juice","lunch","meat","milk","orange","pasta","pizza","rice","salad","sandwich","soup","vegetable","water"],
+  "Animals & nature": ["bear","bird","cat","chicken","cow","dog","duck","elephant","fish","frog","goat","horse","lion","monkey","mouse","pig","rabbit","snake","tiger","tree","flower","grass","leaf","mountain","river"],
+  "Clothes": ["bag","belt","boots","cap","coat","dress","glasses","jacket","jeans","pants","shirt","shoes","shorts","skirt","socks","sweater","t-shirt"],
+  "Sports & free time": ["ball","baseball","basketball","bike","dance","draw","football","game","guitar","kite","music","piano","ride","run","sing","swim","tennis","volleyball"],
+  "Transport & travel": ["airport","bicycle","boat","bus","car","plane","ship","taxi","train","ticket"],
+  "Time & weather": ["afternoon","evening","morning","night","today","tomorrow","yesterday","cloud","cold","hot","rain","sunny","windy"],
+  "Verbs & actions": ["answer","ask","carry","clean","close","colour","cook","cut","dance","draw","drink","eat","find","help","jump","learn","listen","look","open","play","read","ride","run","say","see","sing","sit","sleep","speak","stand","stop","walk","wash","write"]
+};
+
+// --- Utilities ---
+function norm(s){ return s.toLowerCase().replace(/[^a-z]/g, ''); }
+function flattenWords(){
+  const arr=[];
+  for(const g in WORD_GROUPS){
+    WORD_GROUPS[g].forEach(w => arr.push({word:w, group:g}));
+  }
+  return arr;
+}
+const ALL_WORDS = flattenWords();
+
+function speak(text, opts={}){
+  if(!('speechSynthesis' in window)) return alert('Your browser does not support speechSynthesis.');
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = opts.lang || 'en-US';
+  u.rate = opts.rate || 0.95;
+  u.pitch = opts.pitch || 1.0;
+  u.volume = opts.volume || 1.0;
+  window.speechSynthesis.speak(u);
+}
+function speakLetters(text){
+  const letters = text.replace(/\s+/g,'').split('');
+  let i=0;
+  function next(){
+    if(i>=letters.length) return;
+    speak(letters[i]);
+    i++;
+    setTimeout(next, 420);
+  }
+  next();
+}
+function chunkWord(w){
+  const s = w.replace(/\s+/g,'');
+  const chunks=[];
+  let cur='';
+  for(let i=0;i<s.length;i++){
+    cur+=s[i];
+    const isVowel = /[aeiou]/.test(s[i]);
+    const nextIsConsonant = i+1 < s.length && /[^aeiou]/.test(s[i+1]);
+    if(isVowel && nextIsConsonant){
+      chunks.push(cur);
+      cur='';
+    }
+  }
+  if(cur) chunks.push(cur);
+  return chunks.length?chunks:[s];
+}
+
+// --- App state ---
+let filtered = ALL_WORDS.slice();
+let current = null;
+let score = 0;
+let round = 0;
+let best = Number(localStorage.getItem('movers-best')||0);
+document.getElementById('best').textContent = 'Best: '+best;
+
+// --- Populate groups and word list ---
+const groupSelect = document.getElementById('group');
+const groupListDiv = document.getElementById('groupList');
+Object.keys(WORD_GROUPS).forEach(k=>{
+  const o = document.createElement('option'); o.value = k; o.textContent = k; groupSelect.appendChild(o);
+  const btn = document.createElement('button'); btn.textContent = k; btn.className='btn ghost'; btn.style.textAlign='left';
+  btn.onclick = ()=>{ groupSelect.value = k; applyFilter(); };
+  groupListDiv.appendChild(btn);
+});
+
+function renderWords(){
+  const container = document.getElementById('words');
+  container.innerHTML='';
+  filtered.forEach((item, idx)=>{
+    const div = document.createElement('div'); div.className='word-item';
+    const left = document.createElement('div');
+    const w = document.createElement('div'); w.textContent = item.word; w.style.fontWeight='600';
+    const m = document.createElement('div'); m.textContent = item.group; m.className='meta';
+    left.appendChild(w); left.appendChild(m);
+    const btn = document.createElement('button'); btn.className='btn ghost'; btn.textContent='Play';
+    btn.onclick = ()=>speak(item.word);
+    div.appendChild(left); div.appendChild(btn);
+    container.appendChild(div);
+  });
+}
+
+// --- Filtering ---
+document.getElementById('search').addEventListener('input', applyFilter);
+document.getElementById('lenRange').addEventListener('input', e=>{
+  document.getElementById('lenVal').textContent = e.target.value;
+  applyFilter();
+});
+groupSelect.addEventListener('change', applyFilter);
+
+function applyFilter(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const g = groupSelect.value;
+  const len = Number(document.getElementById('lenRange').value);
+  filtered = ALL_WORDS.filter(x => (g==='All' || x.group===g) && norm(x.word).length <= len && x.word.toLowerCase().includes(q));
+  renderWords();
+}
+applyFilter();
+
+// --- Game logic ---
+function startRound(){
+  const pool = filtered.length ? filtered : ALL_WORDS;
+  const pick = pool[Math.floor(Math.random()*pool.length)];
+  current = pick;
+  round++;
+  document.getElementById('round').textContent = round;
+  document.getElementById('lenInfo').textContent = pick.word.replace(/\s+/g,'').length;
+  updateMask(0);
+  document.getElementById('spellingInput').value = '';
+  speak(pick.word);
+}
+function updateMask(hint){
+  // hint: 0 none, 1 first, 2 first+last
+  const s = current ? current.word.replace(/\s+/g,'') : '';
+  if(!s) { document.getElementById('maskText').textContent = '_'; return; }
+  if(hint===0){
+    document.getElementById('maskText').textContent = '_ '.repeat(s.length).trim();
+  } else if(hint===1){
+    document.getElementById('maskText').textContent = s[0] + ' ' + '_ '.repeat(Math.max(0,s.length-1)).trim();
+  } else {
+    document.getElementById('maskText').textContent = s[0] + ' ' + '_ '.repeat(Math.max(0,s.length-2)).trim() + (s.length>1 ? ' '+s[s.length-1] : '');
+  }
+}
+document.getElementById('randBtn').addEventListener('click', startRound);
+document.getElementById('playWord').addEventListener('click', ()=> current && speak(current.word));
+document.getElementById('playLetters').addEventListener('click', ()=> current && speakLetters(current.word));
+document.getElementById('speakTest').addEventListener('click', ()=> speak('Hello! Let us learn words.'));
+
+// Check answer
+document.getElementById('checkBtn').addEventListener('click', checkAnswer);
+document.getElementById('spellingInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+
+function checkAnswer(){
+  if(!current) return alert('請先按「隨機出題」');
+  const input = document.getElementById('spellingInput').value;
+  if(norm(input) === norm(current.word)){
+    score++;
+    document.getElementById('score').textContent = 'Score: '+score;
+    document.getElementById('score2').textContent = score;
+    best = Math.max(best, score);
+    document.getElementById('best').textContent = 'Best: '+best;
+    localStorage.setItem('movers-best', String(best));
+    speak('Great job!');
+    startRound();
+  } else {
+    speak('Try again');
+    document.getElementById('hintBox').textContent = '不正確，請再試一次或使用提示。';
+  }
+}
+
+// Hints
+let hintState = 0;
+document.getElementById('hintFirst').addEventListener('click', ()=>{
+  if(!current) return;
+  hintState = Math.max(hintState,1);
+  updateMask(hintState);
+  document.getElementById('hintBox').textContent = '已顯示第一個字母。';
+  speak(current.word[0]);
+});
+document.getElementById('hintLast').addEventListener('click', ()=>{
+  if(!current) return;
+  hintState = Math.max(hintState,2);
+  updateMask(hintState);
+  document.getElementById('hintBox').textContent = '已顯示第一和最後一個字母。';
+  speak(current.word[current.word.length-1]);
+});
+document.getElementById('hintChunks').addEventListener('click', ()=>{
+  if(!current) return;
+  const chunks = chunkWord(current.word);
+  document.getElementById('hintBox').textContent = '分段: ' + chunks.join(' · ');
+  speak(chunks.join(' '));
+});
+document.getElementById('revealBtn').addEventListener('click', ()=>{
+  if(!current) return;
+  document.getElementById('spellingInput').value = current.word;
+  speak(current.word);
+  document.getElementById('hintBox').textContent = '答案已填入。';
+});
+
+// Download current HTML
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  const doc = '<!doctype html>\\n' + document.documentElement.outerHTML;
+  const blob = new Blob([doc], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'movers_trainer.html';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// Export words as JSON
+document.getElementById('exportWords').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(WORD_GROUPS,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='movers_words.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+// Initial render
+renderWords();
+</script>
+</body>
+</html>
